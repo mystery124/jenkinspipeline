@@ -8,16 +8,7 @@ node {
 
     def HUB_ORG=env.HUB_ORG_DH
     def SFDC_HOST = env.SFDC_HOST_DH
-    def JWT_KEY_CRED_ID = env.JWT_CRED_ID_DH
     def CONNECTED_APP_CONSUMER_KEY=env.CONNECTED_APP_CONSUMER_KEY_DH
-
-    // -------------------------------------------------------------------------
-    // Check out code from source control.
-    // -------------------------------------------------------------------------
-
-    stage('checkout source') {
-        checkout scm
-    }
 
 
     // -------------------------------------------------------------------------
@@ -25,30 +16,31 @@ node {
     // JWT key credentials.
     // -------------------------------------------------------------------------
 
-    withCredentials([file(credentialsId: JWT_KEY_CRED_ID, variable: 'jwt_key_file')]){
+    withCredentials([file(credentialsId: JWT_CRED_ID_DH, variable: 'jwt_key_file')]){
         // -------------------------------------------------------------------------
         // Authenticate to Salesforce using the server key.
         // -------------------------------------------------------------------------
 
         stage('Create Scratch Org') {
-            rc = sh returnStatus: true, script: "sfdx force:auth:jwt:grant --clientid ${CONNECTED_APP_CONSUMER_KEY} --jwtkeyfile \"${JWT_KEY_CRED_ID}\" --username ${HUB_ORG} -a VCEPROD"
+            rc = sh returnStatus: true, script: "sfdx force:auth:jwt:grant --clientid ${CONNECTED_APP_CONSUMER_KEY} --jwtkeyfile '${jwt_key_file}' --username ${HUB_ORG} -a VCEPROD"
             if (rc != 0) { error 'hub org authorization failed' }
 
             // need to pull out assigned username
-            rmsg = sh returnStdout: true, script: "sfdx force:org:create --definitionfile config/project-scratch-def.json --json --setdefaultusername"
+            rmsg = sh(returnStdout: true, script: "sfdx force:org:create --definitionfile config/project-scratch-def.json --targetdevhubusername VCEPROD --json")
             printf rmsg
             def jsonSlurper = new JsonSlurperClassic()
             def robj = jsonSlurper.parseText(rmsg)
-            if (robj.status != "ok") {
+            if (robj.status != 0) {
                 error 'org creation failed: ' + robj.message
             }
-            SFDC_USERNAME=robj.username
+            SFDC_USERNAME=robj.result.username
             robj = null
         }
 
 
         stage('Push To Test Org') {
-            rc = sh returnStatus: true, script: "sfdx force:source:push --targetusername ${SFDC_USERNAME}"
+            sh 'ls ./force-app'
+            rc = sh returnStatus: true, script: "sfdx force:source:push -f --targetusername ${SFDC_USERNAME}"
             if (rc != 0) {
                 error 'push all failed'
             }
