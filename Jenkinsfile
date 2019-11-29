@@ -10,6 +10,10 @@ node {
     def SFDC_HOST = env.SFDC_HOST_DH
     def CONNECTED_APP_CONSUMER_KEY=env.CONNECTED_APP_CONSUMER_KEY_DH
 
+    stage('checkout source') {
+        // when running in multi-branch job, one must issue this command
+        checkout scm
+    }
 
     // -------------------------------------------------------------------------
     // Run all the enclosed stages with access to the Salesforce
