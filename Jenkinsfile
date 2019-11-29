@@ -5,12 +5,14 @@ node {
     def BUILD_NUMBER=env.BUILD_NUMBER
     def RUN_ARTIFACT_DIR="tests/${BUILD_NUMBER}"
     def SFDC_USERNAME
+    def UNIT_TEST_STATUS
+    def CODE_PUSH_STATUS
 
     def HUB_ORG=env.HUB_ORG_DH
     def SFDC_HOST = env.SFDC_HOST_DH
     def CONNECTED_APP_CONSUMER_KEY=env.CONNECTED_APP_CONSUMER_KEY_DH
 
-    stage('checkout source') {
+    stage('Checkout Source') {
         // when running in multi-branch job, one must issue this command
         checkout scm
     }
@@ -44,17 +46,18 @@ node {
 
         stage('Push To Test Org') {
             rc = sh returnStatus: true, script: "sfdx force:source:push -f --targetusername ${SFDC_USERNAME}"
-            if (rc != 0) {
-                error 'push all failed'
-            }
+            CODE_PUSH_STATUS = rc
         }
 
         stage('Run Apex Test') {
-            sh "mkdir -p ${RUN_ARTIFACT_DIR}"
-            timeout(time: 120, unit: 'SECONDS') {
-                rc = sh returnStatus: true, script: "sfdx force:apex:test:run --testlevel RunLocalTests --outputdir ${RUN_ARTIFACT_DIR} --resultformat tap --targetusername ${SFDC_USERNAME}"
-                if (rc != 0) {
-                    error 'apex test run failed'
+            when {
+                expression { CODE_PUSH_STATUS == 0}
+            }
+            steps {
+                sh "mkdir -p ${RUN_ARTIFACT_DIR}"
+                timeout(time: 120, unit: 'SECONDS') {
+                    rc = sh returnStatus: true, script: "sfdx force:apex:test:run --testlevel RunLocalTests --outputdir ${RUN_ARTIFACT_DIR} --resultformat tap --targetusername ${SFDC_USERNAME}"
+                    UNIT_TEST_STATUS = rc
                 }
             }
         }
@@ -68,8 +71,11 @@ node {
             }
         }
 
-        stage('collect results') {
+        stage('Collect Results') {
             junit keepLongStdio: true, testResults: 'tests/**/*-junit.xml'
+            if (UNIT_TEST_STATUS != 0) {
+                error 'apex test run failed'
+            }
         }
 
     }
