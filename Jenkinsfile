@@ -10,6 +10,10 @@ node {
     def SFDC_HOST = env.SFDC_HOST_DH
     def CONNECTED_APP_CONSUMER_KEY=env.CONNECTED_APP_CONSUMER_KEY_DH
 
+    stage('checkout source') {
+        // when running in multi-branch job, one must issue this command
+        checkout scm
+    }
 
     // -------------------------------------------------------------------------
     // Run all the enclosed stages with access to the Salesforce
@@ -39,7 +43,6 @@ node {
 
 
         stage('Push To Test Org') {
-            sh 'tree -d ./force-app/'
             rc = sh returnStatus: true, script: "sfdx force:source:push -f --targetusername ${SFDC_USERNAME}"
             if (rc != 0) {
                 error 'push all failed'
