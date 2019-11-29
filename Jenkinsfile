@@ -39,7 +39,7 @@ node {
 
 
         stage('Push To Test Org') {
-            sh 'ls ./force-app'
+            sh 'ls ./force-app/main/default/classes'
             rc = sh returnStatus: true, script: "sfdx force:source:push -f --targetusername ${SFDC_USERNAME}"
             if (rc != 0) {
                 error 'push all failed'
