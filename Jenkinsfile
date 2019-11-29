@@ -17,12 +17,15 @@ node {
     }
 
     withCredentials([file(credentialsId: JWT_CRED_ID_DH, variable: 'jwt_key_file')]){
+        stage('Authorize in DEV HUB') {
+            rc = sh returnStatus: true, script: "sfdx force:auth:jwt:grant --clientid ${CONNECTED_APP_CONSUMER_KEY} --jwtkeyfile '${jwt_key_file}' --username ${HUB_ORG} -a VCEPROD"
+            if (rc != 0) {
+                error 'Authorize in DEV HUB failed'
+            }
+        }
 
         try {
             stage('Create Scratch Org') {
-                rc = sh returnStatus: true, script: "sfdx force:auth:jwt:grant --clientid ${CONNECTED_APP_CONSUMER_KEY} --jwtkeyfile '${jwt_key_file}' --username ${HUB_ORG} -a VCEPROD"
-                if (rc != 0) { error 'hub org authorization failed' }
-
                 rmsg = sh(returnStdout: true, script: "sfdx force:org:create --definitionfile config/project-scratch-def.json --targetdevhubusername VCEPROD --json")
                 printf rmsg
                 def jsonSlurper = new JsonSlurperClassic()
@@ -34,7 +37,6 @@ node {
                 robj = null
             }
 
-
             stage('Push To Test Org') {
                 rc = sh returnStatus: true, script: "sfdx force:source:push -f --targetusername ${SFDC_USERNAME}"
                 if (rc != 0) {
@@ -44,15 +46,9 @@ node {
 
             stage('Run Apex Test') {
                 sh "mkdir -p ${RUN_ARTIFACT_DIR}"
-                timeout(time: 120, unit: 'SECONDS') {
-                    rc = sh returnStatus: true, script: "sfdx force:apex:test:run --testlevel RunLocalTests --outputdir ${RUN_ARTIFACT_DIR} --resultformat tap --targetusername ${SFDC_USERNAME}"
-                    UNIT_TEST_STATUS = rc
-                }
-            }
-
-            stage('Collect Results') {
+                rc = sh returnStatus: true, script: "sfdx force:apex:test:run --testlevel RunLocalTests --outputdir ${RUN_ARTIFACT_DIR} --resultformat tap --targetusername ${SFDC_USERNAME}"
                 junit keepLongStdio: true, testResults: 'tests/**/*-junit.xml'
-                if (UNIT_TEST_STATUS != 0) {
+                if (rc != 0) {
                     error 'Run Apex Test failed'
                 }
             }
