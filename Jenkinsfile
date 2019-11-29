@@ -43,7 +43,6 @@ node {
 
 
         stage('Push To Test Org') {
-            sh 'tree -d ./force-app/'
             rc = sh returnStatus: true, script: "sfdx force:source:push -f --targetusername ${SFDC_USERNAME}"
             if (rc != 0) {
                 error 'push all failed'
